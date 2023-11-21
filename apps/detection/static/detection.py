@@ -15,6 +15,8 @@ import numpy as np
 from tensorflow.keras.preprocessing import image
 from tensorflow.keras.models import load_model
 from  .vessels  import prepare_model
+from  .disc_optic  import prepare_model_disc_optic
+from  .microaneurism  import prepare_model_microaneurism
 from .inception_4_clases import prepare_model_4_clases
 from .retinopathy_model import predict_image_retinopathy
 import io
@@ -38,7 +40,7 @@ def get_info(id, malignus, startDate, endDate):
     d.patient_id,
     d.active,
     CONCAT('/media/detections/', d.id, '.jpg') AS detection_img,
-    dis.nombre AS disease_name,
+    dis.name AS disease_name,
     CONCAT('/media/detection_prediction/', dis.id, '.jpg')  AS disease_img
 FROM detections d
 INNER JOIN patients p ON p.id = d.patient_id
@@ -109,6 +111,8 @@ def add(base64_img,user):
             cursor.execute(consulta)  
             conexion.commit() 
             result_vessels = get_vessels(str(detectionid))
+            result_disc_optic = get_prediction_disc_optic(str(detectionid))
+            result_microaneurism = get_prediction_microaneurism(str(detectionid))
             prediction = get_prediction_odir_4_clases(str(detectionid))
             info_prediction = get_info_prediction(prediction)
             #return {"vessels":result_vessels,"prediction":prediction}
@@ -118,7 +122,7 @@ def add(base64_img,user):
             img_base64_str = img_base64.decode('utf-8')  # Convertir a string
             
             # Retornar la imagen en base64
-            return {"original": f"data:image/jpeg;base64,{img_base64_str}", "vessels":result_vessels,"prediction":prediction,"description":info_prediction[0],"reference":info_prediction[1]}
+            return {"original": f"data:image/jpeg;base64,{img_base64_str}", "microaneurism": f"data:image/jpeg;base64,{result_microaneurism}","vessels":result_vessels,"disc_optic":f"data:image/jpeg;base64,{result_disc_optic}","prediction":prediction,"description":info_prediction[0],"reference":info_prediction[1]}
 
 def get_info_prediction(prediction):
     engine = create_engine(connect_info)
@@ -254,6 +258,14 @@ def get_prediction_retinopathy(name):
     url = f"./media/detections/{name}.jpg"
     prediction = predict_image_retinopathy(url)
     
+    return 
+def get_prediction_disc_optic(name):
+    url = f"./media/detections/{name}.jpg"
+    prediction = prepare_model_disc_optic(url,512)
+    return prediction
+def get_prediction_microaneurism(name):
+    url = f"./media/detections/{name}.jpg"
+    prediction = prepare_model_microaneurism(url,512)
     return prediction
 def get_prediction_odir_4_clases(name):
     url = f"./media/detections/{name}.jpg"

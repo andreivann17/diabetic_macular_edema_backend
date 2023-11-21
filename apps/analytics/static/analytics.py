@@ -5,6 +5,8 @@ import time
 connect_info = 'mysql+pymysql://root@localhost:3306/diabetic_macular_edema'
 months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+import calendar
+from datetime import datetime, timedelta
 
 
 def get_sql_mes(startDate,endDate):       
@@ -86,56 +88,67 @@ SELECT
     return {"totalData":df["total"].to_list(),"tableBody": df.values,"title":"Week"}
 def get_total_negative(startDate,endDate):
     engine = create_engine(connect_info)
-    consulta = f"select count(id) as count from detections where  prediction_result = 'false' and DATE(datetime) between cast('{startDate}' as DATE) and cast('{endDate}' as DATE)"
+    consulta = f"SELECT count(r.id) AS total_related_count FROM  detections d JOIN detections_predictions r ON d.id = r.detection_id  WHERE  r.disease_id != 47 and DATE(datetime)  between cast('{startDate}' as DATE) and cast('{endDate}' as DATE)"
     df = pd.read_sql_query(sql=consulta, con=engine)
-    return df["count"][0]
+    return df["total_related_count"][0]
 def get_total_positive(startDate,endDate):
     engine = create_engine(connect_info)
-    consulta = f"select count(id) as count from detections where  prediction_result = 'true' and DATE(datetime) between cast('{startDate}' as DATE) and cast('{endDate}' as DATE)"
+    consulta = f"SELECT count(r.id) AS total_related_count FROM  detections d JOIN detections_predictions r ON d.id = r.detection_id  WHERE  r.disease_id = 47 and DATE(datetime)  between cast('{startDate}' as DATE) and cast('{endDate}' as DATE)"
     df = pd.read_sql_query(sql=consulta, con=engine)
-    return df["count"][0]
+    return df["total_related_count"][0]
 def get_total(startDate,endDate):
     engine = create_engine(connect_info)
-    consulta = f"select count(id) as count from detections where DATE(datetime) between cast('{startDate}' as DATE) and cast('{endDate}' as DATE)"
+    consulta = f"SELECT count(r.id) AS total_related_count FROM  detections d JOIN detections_predictions r ON d.id = r.detection_id where DATE(datetime) between cast('{startDate}' as DATE) and cast('{endDate}' as DATE)"
     df = pd.read_sql_query(sql=consulta, con=engine)
-    return df["count"][0]
+    return df["total_related_count"][0]
 def get_total_today():
     engine = create_engine(connect_info)
-    consulta = "SELECT count(id) as count FROM detections WHERE  DATE(datetime) = '"+str(time.strftime("%d-%m-%y"))+"'"
+    consulta = "SELECT count(r.id) AS total_related_count FROM  detections d JOIN detections_predictions r ON d.id = r.detection_id WHERE  DATE(datetime) = '"+str(time.strftime("%d-%m-%y"))+"'"
     df = pd.read_sql_query(sql=consulta, con=engine)
-    return df["count"][0]
+    return df["total_related_count"][0]
 def get_total_negative_all():
     engine = create_engine(connect_info)
-    consulta = f"select count(id) as count from detections where prediction_result = 'true' "
+    consulta = f"SELECT count(r.id) AS total_related_count FROM  detections d JOIN detections_predictions r ON d.id = r.detection_id  WHERE  r.disease_id != 47  "
     df = pd.read_sql_query(sql=consulta, con=engine)
-    return df["count"][0]
+    return df["total_related_count"][0]
 
 def get_total_gender(startDate,endDate):
     engine = create_engine(connect_info)
-    consulta = f"""SELECT g.id, g.name AS genero, COUNT(d.id) AS count
-FROM gender g
-LEFT JOIN patients p ON g.id = p.gender_id
-LEFT JOIN detections d ON p.id = d.patient_id
- and DATE(d.datetime) between cast('{startDate}' as DATE) and cast('{endDate}' as DATE)
+    consulta = f"""SELECT 
+    g.id, 
+    g.name AS genero, 
+    COUNT(d.id) AS counter
+FROM 
+    gender g
+    LEFT JOIN patients p ON g.id = p.gender_id
+    LEFT JOIN detections d ON p.id = d.patient_id
+WHERE 
+    (d.datetime IS NULL OR DATE(d.datetime) BETWEEN cast('{startDate}' as DATE) and cast('{endDate}' as DATE))
 GROUP BY g.id, g.name """    
     df = pd.read_sql_query(sql=consulta, con=engine)
     return {
-       "totalData": df["count"].tolist(),
+       "totalData": df["counter"].tolist(),
        "nameData": df["genero"].tolist(),
        "title":"Gender"
         }
 
 def get_total_blood_type(startDate,endDate):
     engine = create_engine(connect_info)
-    consulta = f"""SELECT b.id, b.type AS blood_type, COUNT(d.id) AS count
-FROM blood_type b
-LEFT JOIN patients p ON b.id = p.gender_id
-LEFT JOIN detections d ON p.id = d.patient_id
- and DATE(d.datetime) between cast('{startDate}' as DATE) and cast('{endDate}' as DATE)
-GROUP BY b.id, b.type"""
+    consulta = f"""SELECT 
+    b.id, 
+    b.type AS blood_type, 
+    COUNT(d.id) AS counter
+FROM 
+    blood_type b
+    LEFT JOIN patients p ON b.id = p.blood_type_id
+    LEFT JOIN detections d ON p.id = d.patient_id
+WHERE 
+    (d.datetime IS NULL OR DATE(d.datetime) BETWEEN CAST('{startDate}' AS DATE) AND CAST('{endDate}' AS DATE))
+GROUP BY 
+    b.id, b.type;"""
     df = pd.read_sql_query(sql=consulta, con=engine)
     return {
-       "totalData": df["count"].tolist(),
+       "totalData": df["counter"].tolist(),
        "nameData": df["blood_type"].tolist(),
        "title":"BloodType"
         }
@@ -172,6 +185,71 @@ GROUP BY
     return {"nombreData":df["name"].tolist(),"totalData":df["total"].tolist(),"resultadoData":df["resultado"].tolist(),"tableData":["Nombre", "Total", "Resultado"],"typeData": ["STR", "STR", "STR"],"porcentajeData":df["porcentaje"].tolist(),"title":"Patients performance","alcanceData":alcance,"currencyData":""}
 
 
+
+
+def obtener_fechas_en_intervalo(fecha_inicio, fecha_fin):
+    inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d")
+    fin = datetime.strptime(fecha_fin, "%Y-%m-%d")
+    fechas = []
+    delta = fin - inicio
+    for i in range(delta.days + 1):
+        dia_actual = inicio + timedelta(days=i)
+        fechas.append(dia_actual.strftime("%Y-%m-%d"))
+    return fechas
+
+def get_sql_dias(fecha_inicio, fecha_fin, value):
+    cnx = pymysql.connect(user='root', password='',
+                          host='localhost', database='diabetic_macular_edema')
+    cursor = cnx.cursor()
+
+    extra = "!=" if not value else "="
+
+    query = """
+    SELECT DAY(datetime), count(d.id) 
+    FROM detections d 
+    INNER JOIN detections_predictions dp ON d.id = dp.detection_id 
+    WHERE datetime BETWEEN %s AND %s 
+    AND dp.disease_id {} 47
+    GROUP BY DAY(datetime)
+    """.format(extra)
+
+    # Obtener todas las fechas en el intervalo
+    todas_las_fechas = obtener_fechas_en_intervalo(fecha_inicio, fecha_fin)
+
+    # Inicializar el diccionario con todas las fechas en el intervalo
+    ventas_por_dia = {fecha: 0 for fecha in todas_las_fechas}
+
+    cursor.execute(query, (fecha_inicio, fecha_fin))
+
+    for dia, total_ventas in cursor:
+        # Formatear la fecha para que coincida con el formato del diccionario
+        fecha = datetime.strptime(f"{fecha_inicio[:4]}-{fecha_inicio[5:7]}-{dia:02d}", "%Y-%m-%d").strftime("%Y-%m-%d")
+        ventas_por_dia[fecha] = float(total_ventas)
+
+    cursor.close()
+    cnx.close()
+
+    return ventas_por_dia
+
+
+
+def obtener_fechas_en_intervalo(fecha_inicio, fecha_fin):
+    # Convertir strings a objetos datetime
+    inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d")
+    fin = datetime.strptime(fecha_fin, "%Y-%m-%d")
+
+    # Lista para almacenar las fechas
+    fechas = []
+
+    # Generar las fechas en el intervalo
+    delta = fin - inicio
+    for i in range(delta.days + 1):
+        dia_actual = inicio + timedelta(days=i)
+        fechas.append(dia_actual.strftime("%Y-%m-%d"))
+
+    return fechas
+
+
 def analytics(startDate,endDate):
 
     return {
@@ -182,7 +260,9 @@ def analytics(startDate,endDate):
         "cardTotal":get_total(startDate,endDate),
         "cardGender":get_total_gender(startDate,endDate),
         "cardBloodType":get_total_blood_type(startDate,endDate),
-        "cardDays":get_sql_days(startDate,endDate),
+        "cardDays":[get_sql_dias(startDate,endDate,True),get_sql_dias(startDate,endDate,False)],
+        "fecha_intervalo" :obtener_fechas_en_intervalo(startDate,endDate)
+    
        
     }
  

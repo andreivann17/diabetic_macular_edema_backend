@@ -19,14 +19,14 @@ def convert_to_base64(image):
     return img_str.decode('utf-8')
 
 def predecir_nueva_imagen(ruta_imagen, img_size):
-    model  = load_model('C:/edema_macular_diabetico/project/models/model_disc_optic.h5')
+    model  = load_model('C:/edema_macular_diabetico/project/models/model_microaneurisms.h5')
     img = cv2.imread(ruta_imagen)
     img = cv2.resize(img, (img_size, img_size))  # Asegúrate que este tamaño coincida con el esperado por tu modelo
     img = np.expand_dims(img, axis=0)
     pred = model.predict(img)
     return pred[0]
 
-def prepare_model_disc_optic(new_image_path, img_size):
+def prepare_model_microaneurism(new_image_path, img_size):
     predicted_mask = predecir_nueva_imagen(new_image_path, img_size)
 
     # Asegúrate de que la máscara sea 2D si es necesario
